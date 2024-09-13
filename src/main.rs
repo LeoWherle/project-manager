@@ -58,10 +58,7 @@ fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) {
     // check if the project directory exists
     if !std::path::Path::new(&project_dir).exists() {
         println!("Project is not on the filesystem");
-        if project.source.is_none() {
-            println!("Project source is not available");
-            return;
-        } else {
+        if !project.source.is_none() {
             println!("Cloning project from source...");
             let source = project.source.as_ref().unwrap();
             let url = &source.url;
@@ -80,6 +77,9 @@ fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) {
                 .clone(url, &project_dir)
                 .expect("Failed to clone repository");
             println!("Cloned repository: {:?}", repo.path());
+        } else {
+            println!("Project source is not available");
+            return;
         }
     }
 
@@ -130,7 +130,6 @@ fn add_project(config: &mut ProjectConfig, project_dir: &str) {
         .expect("Invalid project directory");
 
     // prompt for the project name & optional description
-
     let mut project_name = String::new();
     print!("Enter project name: ");
     std::io::stdout().flush().expect("Failed to flush stdout");
