@@ -12,6 +12,18 @@ Project Manager CLI (`pm`) is a command-line tool to manage your projects effici
 
 ## Installation
 
+### Prerequisites
+
+- [Rust](https://www.rust-lang.org/tools/install)
+- [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+- [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
+- [libssl-dev](https://www.openssl.org/)
+
+**Ubuntu**:
+```sh
+sudo apt install pkg-config libssl-dev
+```
+
 To install the `pm` binary, run the following command:
 
 ```sh
