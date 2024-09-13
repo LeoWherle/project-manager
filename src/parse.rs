@@ -16,7 +16,7 @@ impl ProjectConfig {
     pub fn new() -> ProjectConfig {
         ProjectConfig {
             version: "1.0".to_string(),
-            root_dir: "my-projects".to_string(),
+            root_dir: "my_projects".to_string(),
             projects: Vec::new(),
         }
     }
@@ -43,11 +43,7 @@ impl ProjectConfig {
 ///     },
 ///     "source" : {
 ///         "type" : "git",
-///         "platform" : "github.com",
-///         "path" : {
-///             "owner" : "EpitechPromo2027",
-///             "name" : "B-CPE-110-TLS-1-1-BSQ-leo.wehrle"
-///         }
+///         "url" : "https://github.com/Example/BSQ.git"
 ///     }
 /// }
 /// ```
@@ -66,4 +62,3 @@ pub struct Source {
     pub source_type: String,
     pub url: String,
 }
-
