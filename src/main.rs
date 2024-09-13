@@ -31,7 +31,7 @@ fn load_config() -> ProjectConfig {
 
     if !config_file_path.exists() {
         let config = ProjectConfig::new();
-        let json = serde_json::to_string(&config).expect("Failed to serialize ProjectConfig");
+        let json = serde_json::to_string_pretty(&config).expect("Failed to serialize ProjectConfig");
         // Create the directories if they don't exist
         std::fs::create_dir_all(config_file_path.parent().unwrap())
             .expect("Failed to create directories");
@@ -43,7 +43,7 @@ fn load_config() -> ProjectConfig {
 
 fn save_config(config: &ProjectConfig) {
     let config_file = get_config_file_path();
-    let json = serde_json::to_string(config).expect("Failed to serialize ProjectConfig");
+    let json = serde_json::to_string_pretty(config).expect("Failed to serialize ProjectConfig");
     std::fs::write(config_file, json).expect("Failed to write projects.json");
     println!("Project configuration saved");
 }
@@ -157,6 +157,37 @@ fn add_project(config: &mut ProjectConfig, project_dir: &str) {
     });
 }
 
+fn add_project_from_source(config: &mut ProjectConfig, source: Source) {
+    // prompt for the project name & optional description
+    let mut project_name = String::new();
+    print!("Enter project name: ");
+    std::io::stdout().flush().expect("Failed to flush stdout");
+    std::io::stdin()
+        .read_line(&mut project_name)
+        .expect("Failed to read project name");
+    let project_name = project_name.trim();
+
+    // get project source name
+    let source_name = source.url.split('/').last().unwrap();
+    let source_name = source_name.split('.').next().unwrap();
+
+    let mut project_description = String::new();
+    print!("Enter project description: ");
+    std::io::stdout().flush().expect("Failed to flush stdout");
+    std::io::stdin()
+        .read_line(&mut project_description)
+        .expect("Failed to read project description");
+    let project_description = project_description.trim().to_string().into();
+
+    config.add_project(Project {
+        name: project_name.to_string(),
+        path: source_name.to_string(),
+        description: project_description,
+        languages: Vec::new(),
+        source: Some(source),
+    });
+}
+
 fn main() {
     let cli = Cli::parse();
     let mut config = load_config();
@@ -176,11 +207,17 @@ fn main() {
             todo!();
             // save_config(&config);
         }
-        Commands::AddSource => {
+        Commands::AddSource { url } => {
             // Implement the logic to prompt questions for the new project
             println!("Adding new source...");
-            todo!();
-            // save_config(&config);
+            add_project_from_source(
+                &mut config,
+                Source {
+                    source_type: "git".to_string(),
+                    url: url.to_string(),
+                },
+            );
+            save_config(&config);
         }
         Commands::List { verbose } => {
             // Implement the logic to list projects
