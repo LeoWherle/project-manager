@@ -1,0 +1,23 @@
+[package]
+name = "project-manager-rs"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+
+[[bin]]
+name = "pm"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1.0.128"
+serde = { version = "1.0.210", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
+git2 = "0.19.0"
+
+# build for release
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
