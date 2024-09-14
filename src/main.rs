@@ -123,6 +123,22 @@ fn get_project_source(project_dir: &PathBuf) -> Option<Source> {
     }
 }
 
+// ask user for project name until a valid name is entered
+fn enter_project_name(config: &ProjectConfig) -> Result<String, Box<dyn std::error::Error>> {
+    let mut project_name = String::new();
+    loop {
+        print!("Enter project name: ");
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut project_name)?;
+        let project_name = project_name.trim();
+        if config.find_project(project_name).is_some() {
+            println!("Project name already exists");
+        } else {
+            return Ok(project_name.to_string());
+        }
+    }
+}
+
 fn add_project(
     config: &mut ProjectConfig,
     project_dir: &str,
@@ -131,11 +147,7 @@ fn add_project(
     let project_dir = Path::new(project_dir).canonicalize()?;
     let project_path = project_dir.strip_prefix(&root_dir)?;
 
-    let mut project_name = String::new();
-    print!("Enter project name: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut project_name)?;
-    let project_name = project_name.trim();
+    let project_name = enter_project_name(config)?;
 
     let mut project_description = String::new();
     print!("Enter project description: ");
@@ -158,11 +170,7 @@ fn add_project_from_source(
     config: &mut ProjectConfig,
     source: Source,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut project_name = String::new();
-    print!("Enter project name: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut project_name)?;
-    let project_name = project_name.trim();
+    let project_name = enter_project_name(config)?;
 
     let source_name = source.url.split('/').last().unwrap();
     let source_name = source_name.split('.').next().unwrap();
