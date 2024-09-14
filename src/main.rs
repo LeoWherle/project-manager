@@ -4,8 +4,13 @@ mod parse;
 use clap::Parser;
 use cli::{Cli, Commands};
 use parse::{Project, ProjectConfig, Source};
+use prettytable::{cell, Row, Table};
 use serde_json;
-use std::{io::{self, Write}, path::{Path, PathBuf}, process::Command};
+use std::{
+    io::{self, Write},
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 const CONFIG_FILE: &str = ".config/project-manager/projects.json";
 
@@ -19,7 +24,10 @@ fn get_root_directory(config: &ProjectConfig) -> Result<String, std::env::VarErr
     Ok(format!("{}/{}", home, config.root_dir))
 }
 
-fn get_project_directory(config: &ProjectConfig, project_path: &str) -> Result<String, std::env::VarError> {
+fn get_project_directory(
+    config: &ProjectConfig,
+    project_path: &str,
+) -> Result<String, std::env::VarError> {
     let root = get_root_directory(config)?;
     Ok(format!("{}/{}", root, project_path))
 }
@@ -47,8 +55,14 @@ fn save_config(config: &ProjectConfig) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let project = config.find_project(project_name).ok_or("Project not found")?;
+fn open_project(
+    config: &ProjectConfig,
+    project_name: &str,
+    editor: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let project = config
+        .find_project(project_name)
+        .ok_or("Project not found")?;
     let project_path = &project.path;
     let project_dir = get_project_directory(&config, &project_path)?;
     let project_dir = Path::new(&project_dir);
@@ -77,10 +91,7 @@ fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) -> Res
         }
     }
 
-    Command::new(editor)
-        .arg(project_dir)
-        .spawn()?
-        .wait()?;
+    Command::new(editor).arg(project_dir).spawn()?.wait()?;
     Ok(())
 }
 
@@ -112,7 +123,10 @@ fn get_project_source(project_dir: &PathBuf) -> Option<Source> {
     }
 }
 
-fn add_project(config: &mut ProjectConfig, project_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn add_project(
+    config: &mut ProjectConfig,
+    project_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let root_dir = get_root_directory(config)?;
     let project_dir = Path::new(project_dir).canonicalize()?;
     let project_path = project_dir.strip_prefix(&root_dir)?;
@@ -140,7 +154,10 @@ fn add_project(config: &mut ProjectConfig, project_dir: &str) -> Result<(), Box<
     Ok(())
 }
 
-fn add_project_from_source(config: &mut ProjectConfig, source: Source) -> Result<(), Box<dyn std::error::Error>> {
+fn add_project_from_source(
+    config: &mut ProjectConfig,
+    source: Source,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut project_name = String::new();
     print!("Enter project name: ");
     io::stdout().flush()?;
@@ -165,6 +182,62 @@ fn add_project_from_source(config: &mut ProjectConfig, source: Source) -> Result
     });
     Ok(())
 }
+fn list_projects(
+    config: &ProjectConfig,
+    path: bool,
+    description: bool,
+    languages: bool,
+    source: bool,
+) {
+    let mut table = Table::new();
+
+    let mut headers = if path || description || languages || source {
+        vec![cell!("Name")]
+    } else {
+        vec![]
+    };
+
+    if path {
+        headers.push(cell!("Path"));
+    }
+    if description {
+        headers.push(cell!("Description"));
+    }
+    if languages {
+        headers.push(cell!("Languages"));
+    }
+    if source {
+        headers.push(cell!("Source"));
+    }
+    if path || description || languages || source {
+        table.add_row(Row::new(headers));
+    }
+
+    for project in &config.projects {
+        let mut row = vec![cell!(project.name.to_string())];
+
+        if path {
+            row.push(cell!(project.path.to_string()));
+        }
+        if description {
+            row.push(cell!(project.description.clone().unwrap_or_default()));
+        }
+        if languages {
+            row.push(cell!(project.languages.join(", ")));
+        }
+        if source {
+            row.push(cell!(project
+                .source
+                .as_ref()
+                .map_or("".to_string(), |s| s.url.clone())));
+        }
+
+        table.add_row(Row::new(row));
+    }
+
+    table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
+    table.printstd();
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -186,7 +259,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // save_config(&config)?;
         }
         Commands::AddSource { url } => {
-            // Implement the logic to prompt questions for the new project
             println!("Adding new source...");
             add_project_from_source(
                 &mut config,
@@ -197,20 +269,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             save_config(&config)?;
         }
-        Commands::List { verbose } => {
-            // Implement the logic to list projects
-            if *verbose {
-                println!("Listing projects in verbose mode...");
-            } else {
-                println!("Listing projects...");
-            }
+        Commands::List {
+            path,
+            description,
+            languages,
+            source,
+        } => {
+            list_projects(&config, *path, *description, *languages, *source);
         }
         Commands::Edit => {
             let config_file = get_config_file_path()?;
-            Command::new("code")
-                .arg(config_file)
-                .spawn()?
-                .wait()?;
+            Command::new("code").arg(config_file).spawn()?.wait()?;
         }
     }
 

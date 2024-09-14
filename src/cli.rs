@@ -1,14 +1,12 @@
 use clap::{Parser, Subcommand};
-use std::process::Command;
 use std::sync::LazyLock;
 
 fn generate_version() -> String {
     // Generate a version string from the latest git commit hash
-    let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
-        .output()
-        .expect("Failed to execute git command");
-    let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let repo = git2::Repository::discover(".").expect("Failed to discover git repository");
+    let head = repo.head().expect("Failed to get HEAD reference");
+    let commit = head.peel_to_commit().expect("Failed to get commit object");
+    let hash = commit.id().to_string();
     format!("0.1.0-{}", hash)
 }
 
@@ -39,7 +37,13 @@ pub enum Commands {
     },
     List {
         #[arg(short, long)]
-        verbose: bool,
+        path: bool,
+        #[arg(short, long)]
+        description: bool,
+        #[arg(short, long)]
+        languages: bool,
+        #[arg(short, long)]
+        source: bool,
     },
     Edit,
 }
