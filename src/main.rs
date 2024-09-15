@@ -3,6 +3,7 @@ mod parse;
 
 use clap::Parser;
 use cli::{Cli, Commands};
+use git2::Repository;
 use parse::{Project, ProjectConfig, Source};
 use prettytable::{cell, Row, Table};
 use serde_json;
@@ -12,33 +13,32 @@ use std::{
     process::Command,
 };
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 const CONFIG_FILE: &str = "project-manager/projects.json";
 
-fn get_config_file_path() -> Result<PathBuf, std::env::VarError> {
+fn get_config_file_path() -> Result<PathBuf> {
     if let Some(config_dir) = dirs::config_dir() {
         Ok(config_dir.join(CONFIG_FILE))
     } else {
-        Err(std::env::VarError::NotPresent)
+        Err("Failed to get config directory".into())
     }
 }
 
-fn get_root_directory(config: &ProjectConfig) -> Result<PathBuf, std::env::VarError> {
+fn get_root_directory(config: &ProjectConfig) -> Result<PathBuf> {
     if let Some(home) = dirs::home_dir() {
         Ok(home.join(&config.root_dir))
     } else {
-        Err(std::env::VarError::NotPresent)
+        Err("Failed to get home directory".into())
     }
 }
 
-fn get_project_directory(
-    config: &ProjectConfig,
-    project_path: &Path,
-) -> Result<PathBuf, std::env::VarError> {
+fn get_project_directory(config: &ProjectConfig, project_path: &Path) -> Result<PathBuf> {
     let root = get_root_directory(config)?;
     Ok(root.join(project_path))
 }
 
-fn load_config() -> Result<ProjectConfig, Box<dyn std::error::Error>> {
+fn load_config() -> Result<ProjectConfig> {
     let config_file = get_config_file_path()?;
     if !config_file.exists() {
         let config = ProjectConfig::new();
@@ -53,7 +53,7 @@ fn load_config() -> Result<ProjectConfig, Box<dyn std::error::Error>> {
     Ok(config)
 }
 
-fn save_config(config: &ProjectConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn save_config(config: &ProjectConfig) -> Result<()> {
     let config_file = get_config_file_path()?;
     let json = serde_json::to_string_pretty(config)?;
     std::fs::write(config_file, json)?;
@@ -61,11 +61,35 @@ fn save_config(config: &ProjectConfig) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-fn open_project(
-    config: &ProjectConfig,
-    project_name: &str,
-    editor: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn clone_git_repository(url: &str, project_dir: &Path) -> Result<Repository> {
+    let mut callbacks = git2::RemoteCallbacks::new();
+    callbacks.credentials(|_url, username_from_url, _allowed_types| {
+        if let Some(username) = username_from_url {
+            git2::Cred::ssh_key_from_agent(username)
+        } else {
+            Err(git2::Error::from_str("git Username not provided"))
+        }
+    });
+
+    let mut fetch_options = git2::FetchOptions::new();
+    fetch_options.remote_callbacks(callbacks);
+
+    let mut builder = git2::build::RepoBuilder::new();
+    builder.fetch_options(fetch_options);
+
+    Ok(builder.clone(url, project_dir)?)
+}
+
+fn fetch_repository_from_source(source: &Source, project_dir: &Path) -> Result<PathBuf> {
+    match &source.source_type[..] {
+        "git" => Ok(clone_git_repository(&source.url, project_dir)?
+            .path()
+            .to_path_buf()),
+        _ => Err("Unsupported source type".into()),
+    }
+}
+
+fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) -> Result<()> {
     let project = config
         .find_project(project_name)
         .ok_or("Project not found")?;
@@ -75,28 +99,11 @@ fn open_project(
     if !project_dir.exists() {
         println!("Project is not on the filesystem");
         if let Some(source) = &project.source {
-            println!("Cloning project from source...");
-            let url = &source.url;
-            let mut callbacks = git2::RemoteCallbacks::new();
-            callbacks.credentials(|_url, username_from_url, _allowed_types| {
-                if let Some(username) = username_from_url {
-                    git2::Cred::ssh_key_from_agent(username)
-                } else {
-                    Err(git2::Error::from_str("git Username not provided"))
-                }
-            });
-
-            let mut fetch_options = git2::FetchOptions::new();
-            fetch_options.remote_callbacks(callbacks);
-
-            let mut builder = git2::build::RepoBuilder::new();
-            builder.fetch_options(fetch_options);
-
-            let repo = builder.clone(url, &project_dir)?;
-            println!("Cloned repository: {:?}", repo.path());
+            println!("Fetching project from source...");
+            let repo = fetch_repository_from_source(source, &project_dir)?;
+            println!("Cloned repository: {:?}", repo);
         } else {
-            println!("Project source is not available");
-            return Ok(());
+            return Err("Project source is not available".into());
         }
     }
 
@@ -110,37 +117,43 @@ fn fetch_remote_url(project_dir: &Path) -> Option<String> {
     remote.url().map(|url| url.to_string())
 }
 
+fn get_git_project_source(project_dir: &Path) -> Option<Source> {
+    println!("Adding git repository information...");
+    fetch_remote_url(project_dir)
+        .map(|url| {
+            println!("Git repository URL: {}", url);
+            Source {
+                source_type: "git".to_string(),
+                url,
+            }
+        })
+        .or_else(|| {
+            println!("Failed to fetch remote URL");
+            None
+        })
+}
+
 fn get_project_source(project_dir: &PathBuf) -> Option<Source> {
     if project_dir.join(".git").exists() {
-        println!("Adding git repository information...");
-        match fetch_remote_url(project_dir) {
-            Some(url) => {
-                println!("Git repository URL: {}", url);
-                Some(Source {
-                    source_type: "git".to_string(),
-                    url,
-                })
-            }
-            None => {
-                println!("Failed to fetch remote URL");
-                None
-            }
-        }
-    } else {
-        println!("Project is not a supported external source");
-        None
+        return get_git_project_source(project_dir);
     }
+    println!("Project is not a supported external source");
+    None
+}
+
+fn get_user_input(prompt: &str) -> Result<String> {
+    let mut input = String::new();
+    print!("{}", prompt);
+    io::stdout().flush()?;
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 // ask user for project name until a valid name is entered
-fn enter_project_name(config: &ProjectConfig) -> Result<String, Box<dyn std::error::Error>> {
-    let mut project_name = String::new();
+fn get_user_input_project_name(config: &ProjectConfig) -> Result<String> {
     loop {
-        print!("Enter project name: ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut project_name)?;
-        let project_name = project_name.trim();
-        if config.find_project(project_name).is_some() {
+        let project_name = get_user_input("Enter project name: ")?;
+        if config.find_project(&project_name).is_some() {
             println!("Project name already exists");
         } else {
             return Ok(project_name.to_string());
@@ -148,26 +161,21 @@ fn enter_project_name(config: &ProjectConfig) -> Result<String, Box<dyn std::err
     }
 }
 
-fn add_project(
-    config: &mut ProjectConfig,
-    project_dir: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn add_project(config: &mut ProjectConfig, project_dir: &str) -> Result<()> {
     let root_dir = get_root_directory(config)?;
     let project_dir = Path::new(project_dir).canonicalize()?;
     let project_path = project_dir.strip_prefix(&root_dir)?;
 
-    let project_name = enter_project_name(config)?;
-
-    let mut project_description = String::new();
-    print!("Enter project description: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut project_description)?;
-    let project_description = project_description.trim().to_string().into();
+    let project_name = get_user_input_project_name(config)?;
+    let project_description = get_user_input("Enter project description: ")?.into();
 
     let source = get_project_source(&project_dir);
     config.add_project(Project {
         name: project_name.to_string(),
-        path: project_path.to_str().ok_or("Failed to convert project path to string")?.to_string(),
+        path: project_path
+            .to_str()
+            .ok_or("Failed to convert project path to string")?
+            .to_string(),
         description: project_description,
         languages: Vec::new(),
         source,
@@ -175,20 +183,20 @@ fn add_project(
     Ok(())
 }
 
-fn add_project_from_source(
-    config: &mut ProjectConfig,
-    source: Source,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let project_name = enter_project_name(config)?;
+fn add_project_from_source(config: &mut ProjectConfig, source: Source) -> Result<()> {
+    let project_name = get_user_input_project_name(config)?;
 
-    let source_name = source.url.split('/').last().ok_or("Invalid URL: missing '/'")?;
-    let source_name = source_name.split('.').next().ok_or("Invalid URL: missing '.'")?;
+    let source_name = source
+        .url
+        .split('/')
+        .last()
+        .ok_or("Invalid URL: missing '/'")?;
+    let source_name = source_name
+        .split('.')
+        .next()
+        .ok_or("Invalid URL: missing '.'")?;
 
-    let mut project_description = String::new();
-    print!("Enter project description: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut project_description)?;
-    let project_description = project_description.trim().to_string().into();
+    let project_description = get_user_input("Enter project description: ")?.into();
 
     config.add_project(Project {
         name: project_name.to_string(),
@@ -257,7 +265,7 @@ fn list_projects(
     table.printstd();
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut config = load_config()?;
 
