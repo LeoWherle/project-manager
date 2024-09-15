@@ -191,10 +191,11 @@ fn add_project_from_source(config: &mut ProjectConfig, source: Source) -> Result
         .split('/')
         .last()
         .ok_or("Invalid URL: missing '/'")?;
-    let source_name = source_name
-        .split('.')
-        .next()
-        .ok_or("Invalid URL: missing '.'")?;
+    let source_name = if source_name.ends_with(".git") {
+        &source_name[..source_name.len() - 4]
+    } else {
+        source_name
+    };
 
     let project_description = get_user_input("Enter project description: ")?.into();
 
@@ -265,6 +266,49 @@ fn list_projects(
     table.printstd();
 }
 
+// if the project config has source information, ask the user if they want to keep the project in the config
+fn remove_project_with_source(
+    config: &mut ProjectConfig,
+    project_name: &str,
+    project_dir: &Path,
+) -> Result<()> {
+    let prompt = format!("Do you want to remove {project_name} from the project list? (y/N): ",);
+    match get_user_input(&prompt)?.to_lowercase().as_str() {
+        "y" | "yes" => {
+            config.projects.retain(|p| p.name != project_name);
+        }
+        _ => println!("Keeping project in the project list"),
+    }
+    if project_dir.exists() {
+        std::fs::remove_dir_all(&project_dir)?;
+        println!("Project directory removed");
+    }
+    Ok(())
+}
+
+fn remove_project(config: &mut ProjectConfig, project_name: &str) -> Result<()> {
+    let project = config
+        .find_project(project_name)
+        .ok_or("Project not found")?;
+
+    let project_path = Path::new(&project.path);
+    let project_dir = get_project_directory(&config, project_path)?;
+
+    println!(
+        "You are about to remove the following directory: {:?}",
+        project_dir
+    );
+    let prompt = format!("Are you sure you want to remove {}? (y/N): ", project_name);
+
+    match get_user_input(&prompt)?.to_lowercase().as_str() {
+        "y" | "yes" => {
+            remove_project_with_source(config, project_name, &project_dir)?;
+        }
+        _ => println!("Project removal aborted"),
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut config = load_config()?;
@@ -280,9 +324,8 @@ fn main() -> Result<()> {
         }
         Commands::Remove { directory } => {
             // Implement the logic to remove a directory
-            println!("Removing directory: {}", directory);
-            todo!();
-            // save_config(&config)?;
+            remove_project(&mut config, directory)?;
+            save_config(&config)?;
         }
         Commands::AddSource { url } => {
             println!("Adding new source...");
