@@ -12,37 +12,43 @@ use std::{
     process::Command,
 };
 
-const CONFIG_FILE: &str = ".config/project-manager/projects.json";
+const CONFIG_FILE: &str = "project-manager/projects.json";
 
-fn get_config_file_path() -> Result<String, std::env::VarError> {
-    let home = std::env::var("HOME")?;
-    Ok(format!("{}/{}", home, CONFIG_FILE))
+fn get_config_file_path() -> Result<PathBuf, std::env::VarError> {
+    if let Some(config_dir) = dirs::config_dir() {
+        Ok(config_dir.join(CONFIG_FILE))
+    } else {
+        Err(std::env::VarError::NotPresent)
+    }
 }
 
-fn get_root_directory(config: &ProjectConfig) -> Result<String, std::env::VarError> {
-    let home = std::env::var("HOME")?;
-    Ok(format!("{}/{}", home, config.root_dir))
+fn get_root_directory(config: &ProjectConfig) -> Result<PathBuf, std::env::VarError> {
+    if let Some(home) = dirs::home_dir() {
+        Ok(home.join(&config.root_dir))
+    } else {
+        Err(std::env::VarError::NotPresent)
+    }
 }
 
 fn get_project_directory(
     config: &ProjectConfig,
-    project_path: &str,
-) -> Result<String, std::env::VarError> {
+    project_path: &Path,
+) -> Result<PathBuf, std::env::VarError> {
     let root = get_root_directory(config)?;
-    Ok(format!("{}/{}", root, project_path))
+    Ok(root.join(project_path))
 }
 
 fn load_config() -> Result<ProjectConfig, Box<dyn std::error::Error>> {
     let config_file = get_config_file_path()?;
-    let config_file_path = Path::new(&config_file);
-
-    if !config_file_path.exists() {
+    if !config_file.exists() {
         let config = ProjectConfig::new();
         let json = serde_json::to_string_pretty(&config)?;
-        std::fs::create_dir_all(config_file_path.parent().unwrap())?;
-        std::fs::write(config_file_path, json)?;
+        if let Some(parent) = config_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&config_file, json)?;
     }
-    let config = std::fs::read_to_string(config_file_path)?;
+    let config = std::fs::read_to_string(&config_file)?;
     let config: ProjectConfig = serde_json::from_str(&config)?;
     Ok(config)
 }
@@ -63,9 +69,8 @@ fn open_project(
     let project = config
         .find_project(project_name)
         .ok_or("Project not found")?;
-    let project_path = &project.path;
-    let project_dir = get_project_directory(&config, &project_path)?;
-    let project_dir = Path::new(&project_dir);
+    let project_path = Path::new(&project.path);
+    let project_dir = get_project_directory(&config, project_path)?;
 
     if !project_dir.exists() {
         println!("Project is not on the filesystem");
@@ -74,7 +79,11 @@ fn open_project(
             let url = &source.url;
             let mut callbacks = git2::RemoteCallbacks::new();
             callbacks.credentials(|_url, username_from_url, _allowed_types| {
-                git2::Cred::ssh_key_from_agent(username_from_url.unwrap())
+                if let Some(username) = username_from_url {
+                    git2::Cred::ssh_key_from_agent(username)
+                } else {
+                    Err(git2::Error::from_str("git Username not provided"))
+                }
             });
 
             let mut fetch_options = git2::FetchOptions::new();
@@ -95,7 +104,7 @@ fn open_project(
     Ok(())
 }
 
-fn fetch_remote_url(project_dir: &str) -> Option<String> {
+fn fetch_remote_url(project_dir: &Path) -> Option<String> {
     let repo = git2::Repository::open(project_dir).ok()?;
     let remote = repo.find_remote("origin").ok()?;
     remote.url().map(|url| url.to_string())
@@ -104,7 +113,7 @@ fn fetch_remote_url(project_dir: &str) -> Option<String> {
 fn get_project_source(project_dir: &PathBuf) -> Option<Source> {
     if project_dir.join(".git").exists() {
         println!("Adding git repository information...");
-        match fetch_remote_url(project_dir.to_str().unwrap()) {
+        match fetch_remote_url(project_dir) {
             Some(url) => {
                 println!("Git repository URL: {}", url);
                 Some(Source {
@@ -158,7 +167,7 @@ fn add_project(
     let source = get_project_source(&project_dir);
     config.add_project(Project {
         name: project_name.to_string(),
-        path: project_path.to_str().unwrap().to_string(),
+        path: project_path.to_str().ok_or("Failed to convert project path to string")?.to_string(),
         description: project_description,
         languages: Vec::new(),
         source,
@@ -172,8 +181,8 @@ fn add_project_from_source(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let project_name = enter_project_name(config)?;
 
-    let source_name = source.url.split('/').last().unwrap();
-    let source_name = source_name.split('.').next().unwrap();
+    let source_name = source.url.split('/').last().ok_or("Invalid URL: missing '/'")?;
+    let source_name = source_name.split('.').next().ok_or("Invalid URL: missing '.'")?;
 
     let mut project_description = String::new();
     print!("Enter project description: ");
@@ -190,6 +199,7 @@ fn add_project_from_source(
     });
     Ok(())
 }
+
 fn list_projects(
     config: &ProjectConfig,
     path: bool,
