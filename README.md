@@ -24,12 +24,18 @@ Project Manager CLI (`pm`) is a command-line tool to manage your projects effici
 sudo apt install pkg-config libssl-dev
 ```
 
+### Installation
 To install the `pm` binary, run the following command:
 
 ```sh
 cargo build --release
 ```
 It will prompt you with sudo password to install the binary in `/usr/local/bin` directory.
+
+### Bash Completion
+```sh
+sudo cp pm_completion.sh /etc/bash_completion.d/pm
+```
 
 ## Usage
 
