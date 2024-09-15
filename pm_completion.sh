@@ -11,15 +11,15 @@ _pm_completions() {
         return 0
     fi
 
-    case "${prev}" in
-        open)
-            local projects=$(pm list | awk '{print $1}')
-            COMPREPLY=( $(compgen -W "${projects}" -- ${cur}) )
-            return 0
-            ;;
-        *)
-            ;;
-    esac
+        case "${prev}" in
+            open|remove)
+                local projects=$(pm list | awk '{print $1}')
+                COMPREPLY=( $(compgen -W "${projects}" -- ${cur}) )
+                return 0
+                ;;
+            *)
+                ;;
+        esac
 }
 
 complete -F _pm_completions pm
