@@ -111,6 +111,30 @@ fn open_project(config: &ProjectConfig, project_name: &str, editor: &str) -> Res
     Ok(())
 }
 
+// change directory to the project directory (cross-platform)
+fn navigate_project(config: &ProjectConfig, project_name: &str) -> Result<()> {
+    let project = config
+        .find_project(project_name)
+        .ok_or("Project not found")?;
+    let project_path = Path::new(&project.path);
+    let project_dir = get_project_directory(&config, project_path)?;
+
+    if !project_dir.exists() {
+        eprintln!("Project is not on the filesystem");
+        if let Some(source) = &project.source {
+            eprintln!("Fetching project from source...");
+            let repo = fetch_repository_from_source(source, &project_dir)?;
+            eprintln!("Cloned repository: {:?}", repo);
+        } else {
+            return Err("Project source is not available".into());
+        }
+    }
+
+    // print project PWD full path
+    println!("{}", project_dir.display());
+    Ok(())
+}
+
 fn fetch_remote_url(project_dir: &Path) -> Option<String> {
     let repo = git2::Repository::open(project_dir).ok()?;
     let remote = repo.find_remote("origin").ok()?;
@@ -317,6 +341,9 @@ fn main() -> Result<()> {
         Commands::Open { project_name } => {
             let editor = "code";
             open_project(&config, project_name, editor)?;
+        }
+        Commands::Pwd { project_name } => {
+            navigate_project(&config, project_name)?;
         }
         Commands::Add { directory } => {
             add_project(&mut config, directory)?;
