@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        build-type: [debug, release]
+        build-type: [release]
 
     steps:
       - name: Checkout code
@@ -25,3 +25,6 @@ jobs:
 
       - name: Build in ${{ matrix.build-type }} mode
         run: cargo build --${{ matrix.build-type }}
+
+      - name: Build normal mode
+        run: cargo build
