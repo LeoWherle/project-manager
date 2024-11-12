@@ -269,7 +269,11 @@ impl Config {
             table.add_row(Row::new(headers));
         }
 
-        for project in &self.config.projects {
+        // Create a sorted copy of projects
+        let mut sorted_projects = self.config.projects.clone();
+        sorted_projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+        for project in sorted_projects {
             let mut row = vec![cell!(project.name.to_string())];
 
             if path {

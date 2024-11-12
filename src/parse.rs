@@ -47,7 +47,7 @@ impl ProjectConfig {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
     pub name: String,
     pub path: String,
@@ -56,7 +56,7 @@ pub struct Project {
     pub source: Option<Source>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Source {
     #[serde(rename = "type")]
     pub source_type: String,
