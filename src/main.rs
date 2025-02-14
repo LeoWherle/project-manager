@@ -15,8 +15,7 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
 
     match &cli.command {
         Commands::Open { project_name } => {
-            let editor = &config.inner().editor;
-            config.open_project(project_name, editor)?;
+            config.open_project(project_name)?;
         }
         Commands::Pwd { project_name } => {
             config.navigate_project(project_name)?;
@@ -26,14 +25,13 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
             config.save_config()?;
         }
         Commands::Remove { directory } => {
-            // Implement the logic to remove a directory
             config.remove_project(directory)?;
             config.save_config()?;
         }
         Commands::AddSource { url } => {
             println!("Adding new source...");
             config.add_project_from_source(Source {
-                source_type: String::from("git"),
+                source_type: parse::SourceType::Git,
                 url: url.to_string(),
             })?;
             config.save_config()?;

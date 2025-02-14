@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::env;
+use std::process::Command;
 
 fn main() {
     // Only run this build script when compiling in release mode
@@ -17,7 +17,10 @@ fn main() {
             .expect("Failed to copy the binary to /usr/local/bin");
 
         if !output.status.success() {
-            eprintln!("Error copying binary: {}", String::from_utf8_lossy(&output.stderr));
+            eprintln!(
+                "Error copying binary: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         } else {
             println!("Successfully copied binary to {}", destination);
         }

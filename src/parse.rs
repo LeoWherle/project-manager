@@ -1,9 +1,7 @@
-
 extern crate serde;
 extern crate serde_json;
 
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -63,6 +61,16 @@ pub struct Project {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Source {
     #[serde(rename = "type")]
-    pub source_type: String,
+    pub source_type: SourceType,
     pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum SourceType {
+    /// A git repository
+    #[serde(rename = "git")]
+    Git,
+    /// A web URL
+    #[serde(rename = "web")]
+    Web,
 }
