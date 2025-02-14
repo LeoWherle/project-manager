@@ -15,7 +15,7 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
 
     match &cli.command {
         Commands::Open { project_name } => {
-            let editor = "code";
+            let editor = &config.inner().editor;
             config.open_project(project_name, editor)?;
         }
         Commands::Pwd { project_name } => {
@@ -33,7 +33,7 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
         Commands::AddSource { url } => {
             println!("Adding new source...");
             config.add_project_from_source(Source {
-                source_type: "git".to_string(),
+                source_type: String::from("git"),
                 url: url.to_string(),
             })?;
             config.save_config()?;
@@ -48,7 +48,8 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
         }
         Commands::Edit => {
             let config_file = get_config_file_path()?;
-            Command::new("code").arg(config_file).spawn()?.wait()?;
+            let editor = &config.inner().editor;
+            Command::new(editor).arg(config_file).spawn()?.wait()?;
         }
     }
     Ok(())

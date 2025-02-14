@@ -12,6 +12,17 @@ pub struct Config {
     config: ProjectConfig,
 }
 
+impl Config {
+    #[allow(dead_code)]
+    pub fn inner_mut(&mut self) -> &mut ProjectConfig {
+        &mut self.config
+    }
+
+    pub fn inner(&self) -> &ProjectConfig {
+        &self.config
+    }
+}
+
 const CONFIG_FILE: &str = "project-manager/projects.json";
 
 pub fn get_config_file_path() -> Result<PathBuf> {

@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectConfig {
     pub version: String,
+    /// The editor to use when opening a project (e.g. "code", "vim", "nano")
+    /// Must support opening a directory the following way: `editor /path/to/directory`
+    pub editor: String,
     pub root_dir: String,
     pub projects: Vec<Project>,
 }
@@ -17,6 +20,7 @@ impl ProjectConfig {
         ProjectConfig {
             version: "1.0".to_string(),
             root_dir: "my_projects".to_string(),
+            editor: "code".to_string(),
             projects: Vec::new(),
         }
     }
