@@ -344,6 +344,21 @@ impl Config {
         }
         Ok(())
     }
+
+    pub fn inspect(&self) {
+        if let Ok(folders) = self.config.get_unregistered_folders() {
+            if !folders.is_empty() {
+                println!("Unregistered folders:");
+                for folder in folders {
+                    println!("  {}", folder);
+                }
+            } else {
+                println!("No unregistered folders found");
+            }
+        } else {
+            println!("Failed to inspect unregistered folders");
+        }
+    }
 }
 
 /// Returns the path to the configuration file.

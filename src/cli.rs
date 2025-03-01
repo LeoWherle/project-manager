@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "pm")]
 #[command(about = "Project Manager CLI", long_about = None)]
-#[command(version = "0.1.9")]
+#[command(version = "0.1.10")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -37,4 +37,5 @@ pub enum Commands {
         source: bool,
     },
     Edit,
+    Inspect,
 }

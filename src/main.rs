@@ -49,6 +49,9 @@ pub fn handle_commands(cli: &Cli) -> Result<()> {
             let editor = &config.inner().editor;
             Command::new(editor).arg(config_file).spawn()?.wait()?;
         }
+        Commands::Inspect => {
+            config.inspect();
+        }
     }
     Ok(())
 }

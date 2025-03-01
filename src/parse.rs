@@ -2,6 +2,8 @@ extern crate serde;
 extern crate serde_json;
 
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -29,6 +31,45 @@ impl ProjectConfig {
 
     pub fn find_project(&self, project_name: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.name == project_name)
+    }
+
+    pub fn get_unregistered_folders(&self) -> Result<Vec<String>, std::io::Error> {
+        let home_dir = match dirs::home_dir() {
+            Some(path) => path,
+            None => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Could not find home directory",
+                ));
+            }
+        };
+        let root_dir = Path::new(&home_dir).join(&self.root_dir);
+        if !root_dir.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Root directory does not exist",
+            ));
+        }
+        let mut unregistered_folders = Vec::new();
+
+        for entry in fs::read_dir(&root_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(folder_name) = path.file_name().and_then(|n| n.to_str()) {
+                    let is_registered = self
+                        .projects
+                        .iter()
+                        .any(|project| project.path == folder_name);
+
+                    if !is_registered {
+                        unregistered_folders.push(folder_name.to_string());
+                    }
+                }
+            }
+        }
+
+        Ok(unregistered_folders)
     }
 }
 
