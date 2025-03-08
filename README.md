@@ -28,9 +28,8 @@ sudo apt install pkg-config libssl-dev
 To install the `pm` binary, run the following command:
 
 ```sh
-cargo build --release
+cargo install --path .
 ```
-It will prompt you with sudo password to install the binary in `/usr/local/bin` directory.
 
 ### Bash Completion
 ```sh
@@ -67,3 +66,4 @@ pm [COMMAND]
 ## Configuration
 
 The configuration file is located at [`~/.config/project-manager/projects.json`]("~/.config/project-manager/projects.json"). It stores information about your projects, including their names, paths, descriptions, and sources.
+You can use `pm edit` to open the configuration file in your default editor.

@@ -1,8 +1,7 @@
 [package]
 name = "project-manager-rs"
 version = "0.1.0"
-edition = "2021"
-build = "build.rs"
+edition = "2024"
 
 
 [[bin]]
